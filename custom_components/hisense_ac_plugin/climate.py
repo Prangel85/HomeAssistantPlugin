@@ -93,7 +93,7 @@ async def async_setup_entry(
                 entity = HisenseClimate(coordinator, device)
                 entities.append(entity)
             else:
-                _LOGGER.warning(
+                _LOGGER.debug(
                     "Skipping unsupported device: %s-%s (%s)",
                     getattr(device, 'type_code', None),
                     getattr(device, 'feature_code', None),

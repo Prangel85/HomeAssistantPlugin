@@ -32,6 +32,7 @@ class HisenseWebSocket:
         self._phone_code: str = ""
         self._notification_info: Optional[NotificationInfo] = None
         self._task: Optional[asyncio.Task] = None
+        self._reconnect_task: Optional[asyncio.Task] = None
         self._closing = False
         self._ping_interval = 30
         self._last_ping = 0
@@ -58,7 +59,7 @@ class HisenseWebSocket:
             _LOGGER.debug("Phone code registration %s", "successful" if success else "failed")
             return success
         except Exception as err:
-            _LOGGER.error("Failed to register phone code: %s", err)
+            _LOGGER.warning("Failed to register phone code: %s", err)
             return False
 
     async def _get_notification_info(self, phone_code: str) -> Optional[NotificationInfo]:
@@ -81,7 +82,7 @@ class HisenseWebSocket:
                          notification_info.push_server_ssl_port if notification_info else "N/A")
             return notification_info
         except Exception as err:
-            _LOGGER.error("Failed to get notification info: %s", err)
+            _LOGGER.warning("Failed to get notification info: %s", err)
             return None
 
     async def _connect_ws(self) -> None:
@@ -107,23 +108,31 @@ class HisenseWebSocket:
                 f"{self._notification_info.push_server_ssl_port}/ws/{channel}"
                 f"?phoneCode={self._phone_code}&token={access_token}"
             )
-            _LOGGER.debug("WebSocket URL: %s", ws_url)
+            _LOGGER.debug("WebSocket URL: %s", ws_url.replace(access_token, "***"))
 
-            self._ws = await self.session.ws_connect(
-                ws_url,
-                heartbeat=self._ping_interval,
-                ssl=True
+            self._ws = await asyncio.wait_for(
+                self.session.ws_connect(
+                    ws_url,
+                    heartbeat=self._ping_interval,
+                    ssl=True,
+                ),
+                timeout=30,
             )
             _LOGGER.info("WebSocket connection established")
             self._fail_count = 0
             await self._listen()
 
-        except aiohttp.ClientError as err:
-            _LOGGER.error("WebSocket connection failed: %s", err)
+        except (aiohttp.ClientError, asyncio.TimeoutError) as err:
+            _LOGGER.warning("WebSocket connection failed: %s", err)
             self._fail_count += 1
             if self._fail_count >= self._max_fails:
-                _LOGGER.error("Max connection failures reached")
-                return
+                # Do not give up forever (e.g. temporary DNS/network outage):
+                # wait a few minutes, then start over.
+                _LOGGER.warning("Max connection failures reached, retrying in 5 minutes")
+                await asyncio.sleep(300)
+                self._fail_count = 0
+                if self._closing:
+                    return
 
             # Exponential backoff for reconnection attempts
             retry_delay = min(30, 5 * (2 ** (self._fail_count - 1)))
@@ -178,7 +187,9 @@ class HisenseWebSocket:
             _LOGGER.error("WebSocket listener error: %s", err)
         finally:
             if not self._closing and self._fail_count < self._max_fails:
-                self.hass.loop.create_task(self._delayed_reconnect())
+                self._reconnect_task = self.hass.async_create_background_task(
+                    self._delayed_reconnect(), name="hisense_ac_plugin websocket reconnect"
+                )
 
     async def _delayed_reconnect(self) -> None:
         """Handle reconnection with delay."""
@@ -189,42 +200,56 @@ class HisenseWebSocket:
             self._notification_info = await self._get_notification_info(self._phone_code)
             if self._notification_info:
                 await self._connect_ws()
+        except asyncio.CancelledError:
+            raise
         except Exception as err:
-            _LOGGER.error("Error during reconnection: %s", err)
+            _LOGGER.warning("Error during reconnection: %s", err)
 
     async def async_connect(self) -> None:
-        """Connect to WebSocket server."""
-        try:
-            # Step 1: Generate phone code
-            self._phone_code = await self._generate_phone_code()
-            _LOGGER.debug("Generated phone code: %s", self._phone_code)
+        """Start the WebSocket client in the background (never blocks startup)."""
+        self._closing = False
+        self._task = self.hass.async_create_background_task(
+            self._async_run(), name="hisense_ac_plugin websocket"
+        )
+        _LOGGER.debug("WebSocket background task created")
 
-            # Step 2: Register phone code
-            if not await self._register_phone_code(self._phone_code):
-                _LOGGER.error("Failed to register phone code")
-                return
+    async def _async_run(self) -> None:
+        """Register, fetch notification info and connect, retrying with backoff."""
+        retry_delay = 30
+        while not self._closing:
+            try:
+                # Step 1: Generate phone code
+                self._phone_code = await self._generate_phone_code()
 
-            # Step 3: Get notification info
-            self._notification_info = await self._get_notification_info(self._phone_code)
-            if not self._notification_info:
-                _LOGGER.error("Failed to get notification info")
-                return
+                # Step 2: Register phone code
+                if await self._register_phone_code(self._phone_code):
+                    # Step 3: Get notification info
+                    self._notification_info = await self._get_notification_info(self._phone_code)
+                    if self._notification_info:
+                        # Set ping interval from server config
+                        self._ping_interval = self._notification_info.hb_interval
+                        self._max_fails = self._notification_info.hb_fail_times
 
-            # Set ping interval from server config
-            self._ping_interval = self._notification_info.hb_interval
-            self._max_fails = self._notification_info.hb_fail_times
+                        # Step 4: Connect WebSocket (runs until the connection ends)
+                        await self._connect_ws()
+                        return
+                _LOGGER.warning(
+                    "WebSocket setup failed, retrying in %s seconds", retry_delay
+                )
+            except asyncio.CancelledError:
+                raise
+            except Exception as err:
+                _LOGGER.warning("Failed to start WebSocket: %s", err)
 
-            # Step 4: Connect WebSocket
-            self._closing = False
-            self._task = self.hass.async_create_task(self._connect_ws())
-            _LOGGER.debug("WebSocket connection task created")
-
-        except Exception as err:
-            _LOGGER.error("Failed to connect to WebSocket: %s", err)
+            await asyncio.sleep(retry_delay)
+            retry_delay = min(retry_delay * 2, 600)
 
     async def async_disconnect(self) -> None:
         """Disconnect from WebSocket server."""
         self._closing = True
+        if self._reconnect_task:
+            self._reconnect_task.cancel()
+            self._reconnect_task = None
         if self._ws:
             await self._ws.close()
         if self._task:

@@ -56,16 +56,14 @@ class HisenseACPluginDataUpdateCoordinator(DataUpdateCoordinator):
                 self.api_client,
                 self._handle_ws_message
             )
+            # Non-blocking: the websocket connects in a background task so it
+            # can never delay Home Assistant startup.
             await self._websocket.async_connect()
             self._websocket_connected = True
-            _LOGGER.info("WebSocket connection established")
-            
-            # Update initial device statuses
-            await self._async_update_data()
-            
+
             return True
         except Exception as error:
-            _LOGGER.error("Error setting up coordinator: %s", error)
+            _LOGGER.warning("Error setting up coordinator: %s", error)
             return False
 
     async def _async_update_data(self):
@@ -87,8 +85,9 @@ class HisenseACPluginDataUpdateCoordinator(DataUpdateCoordinator):
             return self._devices
             
         except Exception as error:
-            _LOGGER.error("Error updating device data: %s", error)
-            raise UpdateFailed(f"Error communicating with API: {error}")
+            if isinstance(error, UpdateFailed):
+                raise
+            raise UpdateFailed(f"Error communicating with API: {error}") from error
 
     async def async_refresh_device(self, device_id: str) -> None:
         """Manually refresh a specific device's status."""

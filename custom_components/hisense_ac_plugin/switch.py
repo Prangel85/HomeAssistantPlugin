@@ -15,6 +15,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.core import Event
 from homeassistant.helpers.dispatcher import callback
+from homeassistant.helpers.event import async_call_later
 
 from .const import DOMAIN, StatusKey
 from .coordinator import HisenseACPluginDataUpdateCoordinator
@@ -189,7 +190,7 @@ async def async_setup_entry(
                                 entities.append(entity)
 
             else:
-                _LOGGER.warning(
+                _LOGGER.debug(
                     "Skipping unsupported device: %s-%s (%s)",
                     getattr(device, 'type_code', None),
                     getattr(device, 'feature_code', None),
@@ -197,7 +198,7 @@ async def async_setup_entry(
                 )
 
         if not entities:
-            _LOGGER.warning("No supported switches found")
+            _LOGGER.debug("No supported switches found")
             return
 
         _LOGGER.info("Adding %d switch entities", len(entities))
@@ -269,7 +270,7 @@ class HisenseSwitch(CoordinatorEntity, SwitchEntity):
 
     async def _async_schedule_update(self):
         """异步调度更新实体状态。"""
-        await self.async_schedule_update_ha_state(True)
+        self.async_schedule_update_ha_state(True)
 
     # def _update_entity_name(self):
     #     """根据设备状态动态更新实体名称。"""
@@ -465,10 +466,11 @@ class HisenseSwitch(CoordinatorEntity, SwitchEntity):
             # 计算剩余时间
             remaining_time = self._debounce_delay - (current_time - self._last_action_time)
             # 延后触发更新
-            self.hass.helpers.dispatcher.async_dispatcher_send(
-                f"{DOMAIN}_switch_update_{self.entity_id}",
-                remaining_time
+            async_call_later(
+                self.hass,
+                remaining_time,
+                lambda _now: self.async_schedule_update_ha_state(True),
             )
         else:
             # 正常更新状态
-            await self.async_schedule_update_ha_state(True)
+            self.async_schedule_update_ha_state(True)

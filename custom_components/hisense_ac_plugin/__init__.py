@@ -10,6 +10,7 @@ import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import config_entry_oauth2_flow, config_validation as cv
 from homeassistant.helpers.typing import ConfigType
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -83,8 +84,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     
     # Initialize coordinator and get initial device list
     if not await coordinator.async_setup():
-        _LOGGER.error("Failed to setup coordinator")
-        return False
+        # Cloud/DNS temporarily unreachable: let Home Assistant retry later
+        # instead of failing the entry permanently.
+        await oauth_session.close()
+        raise ConfigEntryNotReady("Unable to fetch devices from ConnectLife cloud")
 
     # Store coordinator in hass.data
     hass.data[DOMAIN][entry.entry_id] = coordinator
@@ -97,6 +100,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
         coordinator = hass.data[DOMAIN][entry.entry_id]
+        await coordinator.async_unload()
         await coordinator.api_client.oauth_session.close()
         hass.data[DOMAIN].pop(entry.entry_id)
 

@@ -29,7 +29,7 @@ class OAuth2Session:
         self.hass = hass
         self.oauth2_implementation = oauth2_implementation
         self.token = token or {}
-        self.session = aiohttp.ClientSession()
+        self.session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30))
         
         _LOGGER.debug("Initialized OAuth2Session with token info: %s", {
             k: '***' if k in ('access_token', 'refresh_token') else v 

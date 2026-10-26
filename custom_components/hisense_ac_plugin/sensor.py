@@ -730,7 +730,7 @@ async def async_setup_entry(
                         )
                         entities.append(entity)
             else:
-                _LOGGER.warning(
+                _LOGGER.debug(
                     "Skipping unsupported device: %s-%s (%s)",
                     getattr(device, 'type_code', None),
                     getattr(device, 'feature_code', None),
@@ -738,7 +738,7 @@ async def async_setup_entry(
                 )
 
         if not entities:
-            _LOGGER.warning("No supported sensors found")
+            _LOGGER.debug("No supported sensors found")
             return
 
         _LOGGER.info("Adding %d sensor entities", len(entities))

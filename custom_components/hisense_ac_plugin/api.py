@@ -16,6 +16,7 @@ import hmac
 import aiohttp
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers.update_coordinator import UpdateFailed
 
 from .const import (
     API_BASE_URL,
@@ -438,12 +439,16 @@ class HisenseApiClient:
                 # _LOGGER.debug("API response: %s", json.dumps(response_data, indent=2))    
                 return response_data
                 
-        except aiohttp.ClientError as err:
-            _LOGGER.error("HTTP request failed: %s", err)
-            raise HisenseApiError(f"HTTP request failed: {err}")
+        except HisenseApiError:
+            raise
+        except (aiohttp.ClientError, TimeoutError) as err:
+            # Not logged at error level here: the caller (coordinator) raises
+            # UpdateFailed and Home Assistant logs the outage only once.
+            _LOGGER.debug("HTTP request failed: %s", err)
+            raise HisenseApiError(f"HTTP request failed: {err}") from err
         except Exception as err:
-            _LOGGER.error("API request failed: %s", err)
-            raise HisenseApiError(f"API request failed: {err}")
+            _LOGGER.debug("API request failed: %s", err)
+            raise HisenseApiError(f"API request failed: {err}") from err
 
     async def _get_system_parameters(self) -> dict[str, Any]:
         """Generate system parameters."""
@@ -655,8 +660,8 @@ class HisenseApiClient:
             return devices
             
         except Exception as err:
-            _LOGGER.error("Failed to fetch devices: %s", err)
-            raise UpdateFailed(f"Error communicating with API: {err}")
+            _LOGGER.debug("Failed to fetch devices: %s", err)
+            raise UpdateFailed(f"Error communicating with API: {err}") from err
 
     @staticmethod
     def create_humidity_parser(base_parser: Humidity007Parser, propertyList: list) -> Humidity007Parser:
