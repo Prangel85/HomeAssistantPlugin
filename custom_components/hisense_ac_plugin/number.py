@@ -15,6 +15,7 @@ from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.core import Event
 from homeassistant.helpers.dispatcher import callback
 
+from .translation import get_translations, translate_name
 from .const import DOMAIN, StatusKey, MIN_TEMP_WATER, MAX_TEMP_WATER
 from .coordinator import HisenseACPluginDataUpdateCoordinator
 from .api import HisenseApiClient
@@ -26,7 +27,7 @@ _LOGGER = logging.getLogger(__name__)
 NUMBER_TYPES = {
     "t_zone1water_settemp1": {
         "key": "t_zone1water_settemp1",
-        "name": "1温区设置值",
+        "name": "Zone 1 Set Temp",
         "icon": "mdi:thermometer",
         "device_class": NumberDeviceClass.TEMPERATURE,
         "mode": NumberMode.AUTO,
@@ -34,11 +35,11 @@ NUMBER_TYPES = {
         "min_value": 16,
         "max_value": 32,
         "step": 0.5,
-        "description": "Set 1温区设置值"
+        "description": "Set Zone 1 Set Temp"
     },
     "t_zone2water_settemp2": {
         "key": "t_zone2water_settemp2",
-        "name": "2温区设置值",
+        "name": "Zone 2 Set Temp",
         "icon": "mdi:thermometer",
         "device_class": NumberDeviceClass.TEMPERATURE,
         "mode": NumberMode.AUTO,
@@ -46,7 +47,7 @@ NUMBER_TYPES = {
         "min_value": 16,
         "max_value": 32,
         "step": 0.5,
-        "description": "Set 2温区设置值"
+        "description": "Set Zone 2 Set Temp"
     }
 }
 
@@ -171,12 +172,7 @@ class HisenseNumber(CoordinatorEntity, NumberEntity):
     @property
     def name(self) -> str:
         """动态获取翻译后的名称"""
-        hass = self.hass
-        translation_key = self._number_type  # 使用开关类型作为键
-        current_lang = hass.config.language
-        translations = hass.data.get(f"{DOMAIN}.translations", {}).get(current_lang, {})
-        translated_name = translations.get(translation_key, self._number_info["name"])
-        return translated_name
+        return translate_name(self.hass, self._number_type, self._number_info["name"])
 
     @property
     def _device(self):

@@ -16,6 +16,7 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from .translation import get_translations, translate_name
 from .const import (
     DOMAIN,
     StatusKey,
@@ -379,8 +380,7 @@ class HisenseDehumidifier(CoordinatorEntity, HumidifierEntity):
         return translated_mode
 
     def _get_translation(self, key: str) -> str:
-        current_lang = self.hass.config.language
-        translations = self.hass.data.get(f"{DOMAIN}.translations", {}).get(current_lang, {})
+        translations = get_translations(self.hass)
         mode = translations.get(key, key)
         return mode
 
@@ -390,8 +390,7 @@ class HisenseDehumidifier(CoordinatorEntity, HumidifierEntity):
             return
 
         try:
-            current_lang = self.hass.config.language
-            translations = self.hass.data[f"{DOMAIN}.translations"][current_lang]
+            translations = get_translations(self.hass)
             key = None
             for k, v in translations.items():
                 if v == mode:

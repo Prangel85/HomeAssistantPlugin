@@ -1,0 +1,42 @@
+{
+    "title": "Hisense Condizionatore",
+    "config": {
+        "step": {
+            "user": {
+                "title": "Connetti a Hisense AC",
+                "description": "Stai per collegare il tuo condizionatore Hisense ({app_name}) a Home Assistant.\n\nID applicazione: {app_id}\n\nAssicurati che la tua istanza di Home Assistant sia raggiungibile all'indirizzo:\n{oauth_callback_url}\n\nFai clic su INVIA per avviare il processo di autenticazione.",
+                "data": {
+                    "confirm_auth": "Sì, voglio autenticarmi"
+                }
+            }
+        },
+        "abort": {
+            "already_configured": "Il dispositivo è già configurato",
+            "single_instance_allowed": "Già configurato. È consentita una sola istanza.",
+            "authorize_url_fail": "Errore nella generazione dell'URL di autorizzazione.",
+            "missing_configuration": "Il componente non è configurato. Segui la documentazione.",
+            "no_url_available": "Nessun URL disponibile. Per informazioni su questo errore, [consulta la sezione di aiuto]({docs_url})",
+            "oauth_error": "Ricevuti dati del token non validi."
+        }
+    },
+    "options": {
+        "step": {
+            "init": {
+                "title": "Opzioni Hisense AC",
+                "description": "{message}",
+                "data": {
+                    "refresh_devices": "Aggiorna elenco dispositivi",
+                    "refresh_token": "Aggiorna token di autenticazione"
+                }
+            }
+        },
+        "error": {
+            "refresh_failed": "Aggiornamento dell'elenco dispositivi non riuscito",
+            "token_refresh_failed": "Aggiornamento del token non riuscito"
+        },
+        "success": {
+            "device_list_refreshed": "Elenco dispositivi aggiornato",
+            "token_refreshed": "Token aggiornato"
+        }
+    }
+}

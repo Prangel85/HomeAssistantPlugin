@@ -17,6 +17,7 @@ from homeassistant.core import Event
 from homeassistant.helpers.dispatcher import callback
 from homeassistant.helpers.event import async_call_later
 
+from .translation import get_translations, translate_name
 from .const import DOMAIN, StatusKey
 from .coordinator import HisenseACPluginDataUpdateCoordinator
 from .api import HisenseApiClient
@@ -154,10 +155,10 @@ async def async_setup_entry(
                                 switch_type = f"fan_speed_{label.lower().replace(' ', '_')}"
                                 switch_info = {
                                     "key": fan_attr.key,
-                                    "name": f"{label} 风速",
+                                    "name": f"{label} fan speed",
                                     "icon_on": "mdi:fan",
                                     "icon_off": "mdi:fan-off",
-                                    "description": f"切换到 {label} 风速",
+                                    "description": f"Switch to {label} fan speed",
                                     "expected_value": value_str
                                 }
                                 entity = HisenseSwitch(
@@ -174,10 +175,10 @@ async def async_setup_entry(
                                 switch_type = f"fan_speed_{label.lower().replace(' ', '_')}"
                                 switch_info = {
                                     "key": fan_attr.key,
-                                    "name": f"{label} 风速",
+                                    "name": f"{label} fan speed",
                                     "icon_on": "mdi:fan",
                                     "icon_off": "mdi:fan-off",
-                                    "description": f"切换到 {label} 风速",
+                                    "description": f"Switch to {label} fan speed",
                                     "expected_value": value_str
                                 }
                                 entity = HisenseSwitch(
@@ -298,12 +299,7 @@ class HisenseSwitch(CoordinatorEntity, SwitchEntity):
     @property
     def name(self) -> str:
         """动态获取翻译后的名称"""
-        hass = self.hass
-        translation_key = self._switch_type  # 使用开关类型作为键
-        current_lang = hass.config.language
-        translations = hass.data.get(f"{DOMAIN}.translations", {}).get(current_lang, {})
-        translated_name = translations.get(translation_key, self._switch_info["name"])
-        return translated_name
+        return translate_name(self.hass, self._switch_type, self._switch_info["name"])
     @property
     def _device(self):
         """Get current device data from coordinator."""

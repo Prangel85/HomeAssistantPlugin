@@ -16,6 +16,7 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from .translation import get_translations, translate_name
 from .const import (
     DOMAIN,
     MIN_TEMP_WATER,
@@ -258,8 +259,7 @@ class HisenseWaterHeater(CoordinatorEntity, WaterHeaterEntity):
 
     # 新增翻译方法
     def _get_translation(self, key: str) -> str:
-        current_lang = self.hass.config.language
-        translations = self.hass.data.get(f"{DOMAIN}.translations", {}).get(current_lang, {})
+        translations = get_translations(self.hass)
 
         # 如果是 type_code == "501" 的设备，优先匹配特殊 key
         if self._current_feature_code == "501" or self._current_feature_code == "500":
@@ -359,8 +359,7 @@ class HisenseWaterHeater(CoordinatorEntity, WaterHeaterEntity):
                 original_key = special_keys[operation_mode]
             else:
                 # 正常从翻译表中查找原始 key
-                current_lang = self.hass.config.language
-                translations = self.hass.data[f"{DOMAIN}.translations"][current_lang]
+                translations = get_translations(self.hass)
                 original_key = None
                 for k, v in translations.items():
                     if v == operation_mode:
@@ -682,8 +681,7 @@ class Atw035699WaterHeater(CoordinatorEntity, WaterHeaterEntity):
             _LOGGER.error("Failed to turn off: %s", err)
 
     def _get_translation(self, key: str) -> str:
-        current_lang = self.hass.config.language
-        translations = self.hass.data.get(f"{DOMAIN}.translations", {}).get(current_lang, {})
+        translations = get_translations(self.hass)
         mode = translations.get(key, key)
         # _LOGGER.debug("当前key：%s, 翻译：%s 取到的：%s", key, translations, mode)
         return mode
@@ -760,8 +758,7 @@ class Atw035699WaterHeater(CoordinatorEntity, WaterHeaterEntity):
 
         try:
             # 将翻译后的名称转换回原始键
-            current_lang = self.hass.config.language
-            translations = self.hass.data[f"{DOMAIN}.translations"][current_lang]
+            translations = get_translations(self.hass)
             original_key = None
             for k, v in translations.items():
                 if v == operation_mode:

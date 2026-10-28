@@ -33,6 +33,10 @@
         "error": {
             "refresh_failed": "Failed to refresh device list",
             "token_refresh_failed": "Failed to refresh token"
+        },
+        "success": {
+            "device_list_refreshed": "Device list has been refreshed",
+            "token_refreshed": "Token has been refreshed"
         }
     }
 }
